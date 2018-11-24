@@ -1,0 +1,2 @@
+uart_DMA_Rcv.c:18:6:msgrx_init	0	static
+uart_DMA_Rcv.c:44:6:msgtx_putc	16	static

@@ -47,14 +47,18 @@
   ******************************************************************************
   */
 /* Includes ------------------------------------------------------------------*/
-
-/* USER CODE BEGIN Includes */
 #include "main.h"
 #include "stm32f1xx_hal.h"
 #include "usb_device.h"
+
+/* USER CODE BEGIN Includes */
+#include <stdbool.h>
+#include "xprintf.h"
+#include "keyinput.h"
 /* USER CODE END Includes */
 
 /* Private variables ---------------------------------------------------------*/
+UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
 /* Private variables ---------------------------------------------------------*/
@@ -66,10 +70,12 @@
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
+static void MX_USART1_UART_Init(void);
 
 /* USER CODE BEGIN PFP */
 /* Private function prototypes -----------------------------------------------*/
 void KeyInput(uint8_t Modifier, uint8_t KeyData, uint8_t Delay);
+void msgtx_putc(uint8_t c);
 /* USER CODE END PFP */
 
 /* USER CODE BEGIN 0 */
@@ -93,7 +99,8 @@ int main(void)
   HAL_Init();
 
   /* USER CODE BEGIN Init */
-
+  //xfunc_in = UART_1_GetChar;		/* xgets入力デバイス指定 */
+  xfunc_out = msgtx_putc;		/* xprintf出力デバイス指定(UART使用時) */
   /* USER CODE END Init */
 
   /* Configure the system clock */
@@ -106,7 +113,14 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_USB_DEVICE_Init();
+  MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
+
+  /* Enable the UART Parity Error Interrupt */
+  //__HAL_UART_DISABLE_IT(&huart1, UART_IT_PE);
+
+  /* Enable the UART Error Interrupt: (Frame error, noise error, overrun error) */
+  //__HAL_UART_DISABLE_IT(&huart1, UART_IT_ERR);
 
   /* USER CODE END 2 */
 
@@ -114,18 +128,29 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+//	  HAL_Delay(1000);
+//	  HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
+//	  HAL_Delay(1000);
+//	  HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_SET);
+//	  xputs("test\n");
 
+	  HAL_Delay(500);
+	  KeyMatrix_Input();
+
+//	  KeyInput(USB_HID_MODIFIER_LEFT_SHIFT, 0x0B, 0);
+//	  KeyInput(0, 0x12, 10);
+//	  KeyInput(0, 0x0A, 10);
+//	  KeyInput(0, 0x08, 10);
   /* USER CODE END WHILE */
-
-	  HAL_Delay(1000);
-
-	  KeyInput(USB_HID_MODIFIER_LEFT_SHIFT, 0x0B, 0);
-	  KeyInput(0, 0x12, 10);
-	  KeyInput(0, 0x0A, 10);
-	  KeyInput(0, 0x08, 10);
 
   /* USER CODE BEGIN 3 */
 
+//	  if(msgrx_circ_buf_is_empty() == false)
+//	  {
+//		  uint8_t c;
+//		  c = msgrx_circ_buf_get();
+//		  xprintf("Input Char : %c",c);
+//	  }
   }
   /* USER CODE END 3 */
 
@@ -189,6 +214,25 @@ void SystemClock_Config(void)
   HAL_NVIC_SetPriority(SysTick_IRQn, 0, 0);
 }
 
+/* USART1 init function */
+static void MX_USART1_UART_Init(void)
+{
+
+  huart1.Instance = USART1;
+  huart1.Init.BaudRate = 115200;
+  huart1.Init.WordLength = UART_WORDLENGTH_8B;
+  huart1.Init.StopBits = UART_STOPBITS_1;
+  huart1.Init.Parity = UART_PARITY_NONE;
+  huart1.Init.Mode = UART_MODE_TX_RX;
+  huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart1.Init.OverSampling = UART_OVERSAMPLING_16;
+  if (HAL_UART_Init(&huart1) != HAL_OK)
+  {
+    _Error_Handler(__FILE__, __LINE__);
+  }
+
+}
+
 /** Configure pins as 
         * Analog 
         * Input 
@@ -199,10 +243,38 @@ void SystemClock_Config(void)
 static void MX_GPIO_Init(void)
 {
 
+  GPIO_InitTypeDef GPIO_InitStruct;
+
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOD_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOA, KP_ROW0_Pin|KP_ROW1_Pin|KP_ROW2_Pin|KP_ROW3_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin : LED_Pin */
+  GPIO_InitStruct.Pin = LED_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(LED_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : KP_ROW0_Pin KP_ROW1_Pin KP_ROW2_Pin KP_ROW3_Pin */
+  GPIO_InitStruct.Pin = KP_ROW0_Pin|KP_ROW1_Pin|KP_ROW2_Pin|KP_ROW3_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : KP_COL0_Pin KP_COL1_Pin KP_COL2_Pin KP_COL3_Pin */
+  GPIO_InitStruct.Pin = KP_COL0_Pin|KP_COL1_Pin|KP_COL2_Pin|KP_COL3_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
 }
 
@@ -238,6 +310,15 @@ void KeyInput(uint8_t Modifier, uint8_t KeyData, uint8_t Delay)
 	USBD_HID_SendReport(&hUsbDeviceFS, &keyboardHID, sizeof(struct keyboardHID_t));
 
 	return;
+}
+
+void msgtx_putc(uint8_t c)
+{
+//	HAL_UART_Transmit_IT(huart_cobs,&c,1);
+	char buf[1];
+	buf[0] = c;
+	HAL_UART_Transmit(&huart1, (uint8_t *)buf, sizeof(buf), 0xFFFF);
+
 }
 
 /* USER CODE END 4 */
