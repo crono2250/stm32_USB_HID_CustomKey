@@ -8,6 +8,6 @@
 #ifndef KEYINPUT_H_
 #define KEYINPUT_H_
 
-uint8_t KeyMatrix_Input(void);
+uint8_t KeyMatrix_Scan(void);
 
 #endif /* KEYINPUT_H_ */

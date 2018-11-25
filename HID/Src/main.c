@@ -58,6 +58,8 @@
 /* USER CODE END Includes */
 
 /* Private variables ---------------------------------------------------------*/
+TIM_HandleTypeDef htim2;
+
 UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
@@ -71,6 +73,7 @@ UART_HandleTypeDef huart1;
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART1_UART_Init(void);
+static void MX_TIM2_Init(void);
 
 /* USER CODE BEGIN PFP */
 /* Private function prototypes -----------------------------------------------*/
@@ -79,7 +82,13 @@ void msgtx_putc(uint8_t c);
 /* USER CODE END PFP */
 
 /* USER CODE BEGIN 0 */
-
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+  if(htim->Instance == TIM2)    // 36M / 999(1000) / 3600 = 100mSec
+  {
+    HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
+  }
+}
 /* USER CODE END 0 */
 
 /**
@@ -99,8 +108,8 @@ int main(void)
   HAL_Init();
 
   /* USER CODE BEGIN Init */
-  //xfunc_in = UART_1_GetChar;		/* xgets���̓f�o�C�X�w�� */
-  xfunc_out = msgtx_putc;		/* xprintf�o�̓f�o�C�X�w��(UART�g�p��) */
+  //xfunc_in = UART_1_GetChar;		/* xgets?�ｿｽ�ｿｽ?�ｿｽ�ｿｽ?�ｿｽ�ｿｽﾍデ?�ｿｽ�ｿｽo?�ｿｽ�ｿｽC?�ｿｽ�ｿｽX?�ｿｽ�ｿｽw?�ｿｽ�ｿｽ?�ｿｽ�ｿｽ */
+  xfunc_out = msgtx_putc;		/* xprintf?�ｿｽ�ｿｽo?�ｿｽ�ｿｽﾍデ?�ｿｽ�ｿｽo?�ｿｽ�ｿｽC?�ｿｽ�ｿｽX?�ｿｽ�ｿｽw?�ｿｽ�ｿｽ?�ｿｽ�ｿｽ(UART?�ｿｽ�ｿｽg?�ｿｽ�ｿｽp?�ｿｽ�ｿｽ?�ｿｽ�ｿｽ) */
   /* USER CODE END Init */
 
   /* Configure the system clock */
@@ -114,6 +123,9 @@ int main(void)
   MX_GPIO_Init();
   MX_USB_DEVICE_Init();
   MX_USART1_UART_Init();
+  MX_TIM2_Init();
+  HAL_TIM_Base_Start_IT(&htim2);
+
   /* USER CODE BEGIN 2 */
 
   /* Enable the UART Parity Error Interrupt */
@@ -122,20 +134,30 @@ int main(void)
   /* Enable the UART Error Interrupt: (Frame error, noise error, overrun error) */
   //__HAL_UART_DISABLE_IT(&huart1, UART_IT_ERR);
 
+uint8_t DetectKey = 0xFF;
+static uint8_t DetectKey_old = 0xFF;
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  while (1)
-  {
+   while (1)
+   {
 //	  HAL_Delay(1000);
 //	  HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
 //	  HAL_Delay(1000);
 //	  HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_SET);
 //	  xputs("test\n");
 
-	  HAL_Delay(500);
-	  KeyMatrix_Input();
+	HAL_Delay(10);
+	DetectKey = KeyMatrix_Scan();
+
+	if(DetectKey_old != DetectKey && DetectKey != 0xFF)  // 繧ｨ�ｿｽ?繧ｸ讀懶ｿｽ?�ｿｽ縺励※謚ｼ荳区､懶ｿｽ?�ｿｽ
+	{
+		DetectKey_old = DetectKey;
+		xprintf("Push Key %d\n",DetectKey);
+	}
+	DetectKey_old = DetectKey;
 
 //	  KeyInput(USB_HID_MODIFIER_LEFT_SHIFT, 0x0B, 0);
 //	  KeyInput(0, 0x12, 10);
@@ -145,12 +167,6 @@ int main(void)
 
   /* USER CODE BEGIN 3 */
 
-//	  if(msgrx_circ_buf_is_empty() == false)
-//	  {
-//		  uint8_t c;
-//		  c = msgrx_circ_buf_get();
-//		  xprintf("Input Char : %c",c);
-//	  }
   }
   /* USER CODE END 3 */
 
@@ -212,6 +228,39 @@ void SystemClock_Config(void)
 
   /* SysTick_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(SysTick_IRQn, 0, 0);
+}
+
+/* TIM2 init function */
+static void MX_TIM2_Init(void)
+{
+
+  TIM_ClockConfigTypeDef sClockSourceConfig;
+  TIM_MasterConfigTypeDef sMasterConfig;
+
+  htim2.Instance = TIM2;
+  htim2.Init.Prescaler = 999;
+  htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim2.Init.Period = 3600;
+  htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
+  if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
+  {
+    _Error_Handler(__FILE__, __LINE__);
+  }
+
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim2, &sClockSourceConfig) != HAL_OK)
+  {
+    _Error_Handler(__FILE__, __LINE__);
+  }
+
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
+  {
+    _Error_Handler(__FILE__, __LINE__);
+  }
+
 }
 
 /* USART1 init function */
@@ -300,12 +349,12 @@ void KeyInput(uint8_t Modifier, uint8_t KeyData, uint8_t Delay)
 	keyboardHID.key3 = 0;
 
 	HAL_Delay(Delay);
-	keyboardHID.modifiers = Modifier;	// �L�[����
+	keyboardHID.modifiers = Modifier;	// ?�ｿｽ�ｿｽL?�ｿｽ�ｿｽ[?�ｿｽ�ｿｽ?�ｿｽ�ｿｽ?�ｿｽ�ｿｽ?�ｿｽ�ｿｽ
 	keyboardHID.key1 = KeyData;
 	USBD_HID_SendReport(&hUsbDeviceFS, &keyboardHID, sizeof(struct keyboardHID_t));
 
 	HAL_Delay(30);
-	keyboardHID.modifiers = 0;	// ����
+	keyboardHID.modifiers = 0;	// ?�ｿｽ�ｿｽ?�ｿｽ�ｿｽ?�ｿｽ�ｿｽ?�ｿｽ�ｿｽ
 	keyboardHID.key1 = 0;
 	USBD_HID_SendReport(&hUsbDeviceFS, &keyboardHID, sizeof(struct keyboardHID_t));
 

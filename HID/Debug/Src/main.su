@@ -1,5 +1,6 @@
-main.c:315:6:msgtx_putc	16	static
-main.c:163:6:SystemClock_Config	88	static
-main.c:90:5:main	40	static
-main.c:283:6:KeyInput	24	static
-main.c:332:6:_Error_Handler	0	static
+main.c:364:6:msgtx_putc	16	static
+main.c:85:6:HAL_TIM_PeriodElapsedCallback	0	static
+main.c:179:6:SystemClock_Config	88	static
+main.c:99:5:main	64	static
+main.c:332:6:KeyInput	24	static
+main.c:381:6:_Error_Handler	0	static
